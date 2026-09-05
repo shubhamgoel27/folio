@@ -276,10 +276,21 @@ doesn't appear.
 
 ## What Artifold is not
 
-- **Not a cloud product.** Nothing leaves your machine unless you
-  explicitly `artifold share`. There's no sign-up, no account, no Artifold
+- **Not a cloud product.** There's no sign-up, no account, no Artifold
   server somewhere. Your library is `~/artifold-inbox/` and the dirs you
-  pointed it at — that's it.
+  pointed it at — that's it. Artifold itself never uploads anything: it has
+  no credentials for anywhere.
+
+  Two things can send an artifact off your machine, both of them yours to
+  trigger. `artifold share` publishes to *your* GitHub Pages, explicitly,
+  one artifact at a time. And the bundled `/craft` skill publishes each new
+  artifact to claude.ai as it makes it — a page private to you until you
+  share it from its header — so it has a link when you want one. That
+  second one is on by default; turn it off with:
+
+  ```bash
+  artifold config publish off
+  ```
 - **Not a replacement for git** or your existing organization. It's a
   *lens* on whatever you already have.
 - **Not opinionated about where your files live.** Multi-root by

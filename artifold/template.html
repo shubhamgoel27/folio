@@ -306,6 +306,13 @@ body {
 .card .meta { display: flex; align-items: center; gap: 6px; color: var(--text-dim); font-size: 11.5px; margin-top: 3px; }
 .card .meta .cat-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--c, var(--text-dim)); }
 .card .shared-mark { color: var(--ok); }
+/* Published, not shared — a link back to your own private copy. Quiet on
+   purpose: it must not read as "this is public", which the green dot means. */
+.card .pub-mark {
+  font-size: 10.5px; text-decoration: none; color: var(--text-mut);
+  border-bottom: 1px solid var(--line-2); line-height: 1;
+}
+.card .pub-mark:hover { color: var(--accent); }
 /* Usage badges. Deliberately quiet: they mark the few artifacts you keep
    coming back to, so they must not shout on the ~90% that carry neither. */
 .card .revs {
@@ -1105,7 +1112,10 @@ function cardHTML(p) {
         <span>·</span><span>${fmt(p.primary.mtime)}</span>
         ${p.revision_count > 1 ? `<span class="revs" title="Edited in place ${p.revision_count - 1} time(s) since it was created">${p.revision_count}&#8202;rev</span>` : ''}
         ${p.open_count ? `<span class="revs" title="Opened ${p.open_count} time(s)">${p.open_count}&#8202;&#x2197;</span>` : ''}
-        ${isShared(p) ? `<span class="shared-mark" title="Shared">●</span>` : ''}
+        ${prov.published_url ? `<a class="pub-mark" href="${prov.published_url}" target="_blank" rel="noopener"
+             title="Open the published page on claude.ai (private to you until you share it)"
+             onclick="event.stopPropagation()">link</a>` : ''}
+        ${isShared(p) ? `<span class="shared-mark" title="Shared publicly">●</span>` : ''}
       </div>
     </div>
   </div>`;
@@ -1223,6 +1233,14 @@ function renderProvenance() {
   const rows = [];
   if (prov.tool) rows.push(['Tool', TOOL_LABELS[prov.tool] || prov.tool]);
   if (prov.source) rows.push(['Source', `<a href="${prov.source}" target="_blank">${escape(prov.source)}</a>`]);
+  // Published ≠ shared. A claude.ai artifact is private to its author until
+  // they share it from the page header, so this is a link back to your own
+  // copy — not evidence anything is public. Artifold's own `shares` list,
+  // rendered further down, is the public one.
+  if (prov.published_url) {
+    rows.push(['Published', `<a href="${prov.published_url}" target="_blank">${escape(prov.published_url)}</a>`
+      + `<div style="margin-top:3px;font-size:11px;color:var(--text-dim)">Private to you until you share it from the page.</div>`]);
+  }
   if (prov.model) rows.push(['Model', prov.model]);
   if (prov.intent) rows.push(['Intent', escape(prov.intent)]);
   if (prov.topic && prov.topic.length) rows.push(['Topics', prov.topic.map(t => `<span class="tag">${escape(t)}</span>`).join('')]);

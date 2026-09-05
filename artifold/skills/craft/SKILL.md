@@ -217,7 +217,7 @@ Hard limits: uppercase-mono eyebrow only in `field-essay`/`editorial-newsprint`/
 
 ## Step 5: Embed Artifold provenance
 
-In `<head>` (all ten are required so future runs can rotate every axis, including intensity):
+In `<head>` (the first ten are required so future runs can rotate every axis, including intensity):
 ```html
 <meta name="artifold:intent" content="<10–15 word description>">
 <meta name="artifold:generator" content="craft">
@@ -247,7 +247,7 @@ If the user referenced a past artifact, also add `<meta name="artifold:style-fro
 8. **Legibility floors:** body ≥16px · measure 60–75ch · interactive targets ≥44px · body text ≥4.5:1 contrast on its background · not pure-black on white.
 9. **Accessibility:** headings in logical order · `:focus-visible` styles on interactive elements · all motion behind `prefers-reduced-motion` · `alt` on every image.
 10. Does the skeleton match what a designer at the **canonical reference** (Step 1) would build, and could someone name the voice register from the headlines alone?
-11. All ten `artifold:*` tags present, and one distinctive choice a designer would call intentional?
+11. All ten `artifold:*` tags present (plus `artifold:published` after Step 8.5), and one distinctive choice a designer would call intentional?
 12. **Conceit test:** can you state the fiction in one sentence, and does every label/button/footnote live inside it? (Or did you consciously choose `none`?)
 13. **Warmth test** (scaled to tier): is there at least one true human touch, and would the intended reader feel the page was made *for them*? Any personal detail used — is it real, from actual context?
 14. **Weird-thing test** (`read`/`experience` only): name the one deliberate rule-break. Is it exactly one, legible, reduced-motion-safe, and native to the conceit? At `glance` tier the correct answer is "there isn't one."
@@ -290,8 +290,38 @@ Your first render is almost never perfect. Treat this as a **bug hunt, not a con
 
 If `artifold` is installed: run `artifold inbox <topic>` for the exact path, then Write there. Else default to `~/artifold-inbox/YYYY-MM-DD-<topic-slug>.html`. Slugs: 4–6 words, lowercase, kebab-case. (You may render from a temp path during Step 7 and save once verified, or save first and screenshot in place — either is fine.)
 
+## Step 8.5: Publish it, so it has a link
+
+A local file can't be sent to anyone. Publishing gives the page a URL on
+claude.ai that is **private to the user** until they choose to share it from
+the page header — so this costs nothing in privacy terms and saves the whole
+"how do I send this to someone" problem later.
+
+Artifold itself cannot do this: publishing needs a claude.ai session, and a
+standalone CLI has none. You are inside one, so this step belongs here.
+
+1. Check the user's preference: `artifold config publish` (prints `on` or
+   `off`; treat a missing `artifold` or any error as `on`). If it prints
+   `off`, skip this step entirely.
+2. Publish the saved file with the Artifact tool. Reuse what you already
+   chose: the page's real `<title>`, an emoji favicon that matches the
+   conceit, and the intent as the one-line description.
+3. Add the returned URL to the file's `<head>` as an eleventh tag, then
+   leave the file alone:
+   ```html
+   <meta name="artifold:published" content="<the returned URL>">
+   ```
+   Artifold reads that tag and puts the link on the card, so the user can
+   find it again in a month without searching their history.
+
+If publishing fails or isn't available on this account, say so in one line
+and move on. The local file is the deliverable; the link is a convenience.
+
+Never republish an artifact the user has already shared publicly without
+asking — a republish changes what their viewers see.
+
 After saving, tell the user in two lines:
-- the path you wrote;
+- the path you wrote, and the published link if there is one;
 - *"Will show up in your Artifold dashboard within ~2 seconds. Layout `<archetype>` · mode `<mode>` · `<register>` voice · `<device>` device."*
 
 Don't dump the HTML in chat — the file is the deliverable. Briefly note the one or two key decisions (especially the layout choice and why), then stop. Don't pad, don't pre-narrate, don't apologize for design choices.
@@ -310,5 +340,5 @@ Don't dump the HTML in chat — the file is the deliverable. Briefly note the on
 8. **Build**: skeleton first, then paint, then the device; add warmth + the weird thing per tier.
 9. **Finish**: copy pass → typeset pass → furniture (captions, sources, folios).
 10. **Verify**: defect hunt at 3 widths → squint test → art-director rubric (per tier); fix, re-render.
-11. **Provenance** (10 tags) and save via `artifold inbox`.
+11. **Provenance** (10 tags), save via `artifold inbox`, then publish (8.5) and stamp `artifold:published`.
 12. **Hand off in two lines**, name the key decision, stop.

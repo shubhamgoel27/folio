@@ -495,6 +495,37 @@ SUPPORT_BLURB = {
 }
 
 
+def _cmd_config(args):
+    """Read or write a scalar setting.
+
+    `artifold config publish` prints `on`/`off` — the form /craft calls before
+    deciding whether to publish an artifact. Booleans print as on/off rather
+    than True/False so a shell test reads naturally.
+    """
+    def show(v):
+        return ("on" if v else "off") if isinstance(v, bool) else \
+               ("" if v is None else str(v))
+
+    if not args.key:
+        cfg = config.load()
+        for k in sorted(config.SETTABLE):
+            print(f"  {k:<20}{show(cfg.get(k, config.DEFAULTS.get(k)))}")
+        return 0
+    try:
+        if args.value is None:
+            print(show(config.get(args.key)))
+        else:
+            print(show(config.set_(args.key, args.value)))
+    except KeyError:
+        print(f"  ! unknown key: {args.key}")
+        print(f"    known: {', '.join(sorted(config.SETTABLE))}")
+        return 1
+    except ValueError as e:
+        print(f"  ! {e}")
+        return 1
+    return 0
+
+
 def _cmd_skills(args):
     """Show which design skills are installed and what Artifold recovers.
 
@@ -802,6 +833,11 @@ def main(argv=None) -> int:
     ib.add_argument("topic", nargs="*",
                     help="topic words → filename slug (defaults to 'untitled')")
     ib.set_defaults(fn=_cmd_inbox)
+
+    cf = sub.add_parser("config", help="read or write a setting (no args lists them)")
+    cf.add_argument("key", nargs="?", help="e.g. publish")
+    cf.add_argument("value", nargs="?", help="omit to read; on/off for switches")
+    cf.set_defaults(fn=_cmd_config)
 
     sub.add_parser("skills",
                    help="design skills Artifold works with, and what it reads "

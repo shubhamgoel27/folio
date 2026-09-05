@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.12.0
+
+Every new `/craft` artifact now gets a link, without you setting up GitHub.
+
+### Why it works this way
+
+Publishing to claude.ai needs a claude.ai session. Artifold is a standalone
+CLI and has none — Anthropic's docs are explicit that "sessions using an API
+key, gateway token, or cloud-provider credential cannot publish", and the only
+artifact HTTP endpoints that exist are the admin-scoped Compliance API's list,
+read and delete. There is no publish endpoint, and `artifold share --claude`
+cannot be built.
+
+`/craft` runs *inside* Claude Code, where that session does exist. So the
+skill publishes, and Artifold records the result:
+
+- **`/craft` publishes each artifact** after saving it, then stamps the URL
+  into the page as `artifold:published`.
+- **Artifold reads the tag** and puts a quiet `link` on the card plus a row
+  in the detail pane. The link survives the round trip: the skill stamps the
+  tag *after* the first scan, so the artifact picks it up as a revision
+  rather than becoming a new project.
+- **`artifold config publish off`** turns it off. New `artifold config`
+  command reads and writes the scalar settings; with no arguments it lists
+  them.
+
+### Published is not shared
+
+A claude.ai artifact is private to its author until they share it from the
+page header. The card's `link` is deliberately not the green share dot, the
+detail pane says "Private to you until you share it from the page", and the
+metadata spec tells other implementers not to render it as a public badge.
+Artifold's own `shares` list — GitHub Pages, explicitly published — stays the
+only thing that means public.
+
+### One correction to the README
+
+The old claim "nothing leaves your machine unless you explicitly
+`artifold share`" is no longer true with this default on, so it now says what
+actually happens: Artifold itself still uploads nothing and holds no
+credentials, `artifold share` publishes to your GitHub Pages, and `/craft`
+publishes privately to claude.ai unless you turn it off.
+
 ## 0.11.0
 
 **Scans are 9× faster: 1.63 s → 0.18 s** on a 135-project library. Cards

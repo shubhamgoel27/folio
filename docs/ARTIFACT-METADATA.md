@@ -48,6 +48,7 @@ sentence, 10–15 words, describing what the page is *for*. Not its title.
 | `design-mode` | The skin: palette and type family. |
 | `voice-register` | The tone of the copy. |
 | `signature-device` | The one built thing on the page. |
+| `published` | URL where this page is hosted, if the generator published it. |
 | `style-from` | Id of a past artifact this deliberately echoes. |
 
 The last four are **rotation axes**. Their whole purpose is to be read back
@@ -56,6 +57,18 @@ we do not define a vocabulary. `macrostructure: Marquee Hero` and
 `layout-archetype: card-stack-dossier` are both fine. What matters is that
 the same skill uses the same words consistently, so "not this again" is
 computable.
+
+### A note on `published`
+
+`published` says "this page also exists at this URL". It does **not** mean
+the page is public — a claude.ai artifact is private to its author until they
+share it, and a reader has no way to tell from the tag. So treat it as a
+convenience link back to your own copy, and don't render it as a public-share
+badge. Artifold keeps it deliberately separate from its own share records for
+this reason.
+
+If your generator can publish, writing this tag is the difference between an
+artifact the user can send someone and one they have to hunt for.
 
 ### Conventions
 

@@ -102,7 +102,53 @@ DEFAULTS = {
     "intent_model": "claude-haiku-4-5",
     "intent_concurrency": 5,
     "drop_dir": None,          # where `artifold import <url>` saves fetched artifacts
+    # Whether /craft publishes each new artifact to claude.ai and records the
+    # link. Artifold itself never publishes — it has no claude.ai session —
+    # so this is a preference the skill reads, not something the CLI acts on.
+    # Published artifacts are private to their author until shared.
+    "publish": True,
 }
+
+# Config keys `artifold config` may read or write. Roots and allow-lists have
+# their own commands because they are lists with validation; this is for the
+# plain scalar switches.
+SETTABLE = {
+    "publish": bool,
+    "enable_intent": bool,
+    "intent_model": str,
+    "intent_concurrency": int,
+    "max_depth": int,
+    "drop_dir": str,
+}
+
+
+def get(key: str):
+    if key not in SETTABLE:
+        raise KeyError(key)
+    return load().get(key, DEFAULTS.get(key))
+
+
+def set_(key: str, raw: str):
+    """Coerce a CLI string into the key's type and store it."""
+    if key not in SETTABLE:
+        raise KeyError(key)
+    kind = SETTABLE[key]
+    if kind is bool:
+        low = raw.strip().lower()
+        if low in ("on", "true", "yes", "1"):
+            value = True
+        elif low in ("off", "false", "no", "0"):
+            value = False
+        else:
+            raise ValueError(f"{key} expects on/off, got {raw!r}")
+    elif kind is int:
+        value = int(raw)
+    else:
+        value = raw
+    cfg = load()
+    cfg[key] = value
+    save(cfg)
+    return value
 
 
 def load() -> dict:

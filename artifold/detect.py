@@ -42,6 +42,11 @@ META_STYLE_FROM       = _meta("style-from")
 # `generator` is the skill on top of it (craft, hallmark, taste-skill), so
 # a library can tell two skills apart when both ran on the same model.
 META_GENERATOR        = _meta("generator")
+# Where this page is published. Distinct from `source` (where it came *from*)
+# and from `shares` (Artifold's own GitHub Pages publishing). A claude.ai
+# artifact is private to its author until they share it, so this URL is a
+# convenience link, not evidence that anything is public.
+META_PUBLISHED        = _meta("published")
 
 
 def detect_tool(html: str) -> str | None:
@@ -75,6 +80,7 @@ def extract_embedded_meta(html: str) -> dict:
         ("conceit",           META_CONCEIT),
         ("scale",             META_SCALE),
         ("generator",         META_GENERATOR),
+        ("published_url",     META_PUBLISHED),
         ("style_from",        META_STYLE_FROM),
     ]
     for key, pat in fields:
