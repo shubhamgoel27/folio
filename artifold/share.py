@@ -13,6 +13,7 @@ Cloudflare Pages backend is planned (v0.3-beta) for users without `gh`.
 from __future__ import annotations
 
 import hashlib
+import re
 import subprocess
 import sys
 import time
@@ -247,6 +248,24 @@ def share_via_gh(file: Path, no_clipboard: bool = False) -> str | None:
         print(f"  ! push failed: {push.stderr.strip()}")
         return None
 
+    # Record the share the moment the push lands, before waiting on Pages.
+    #
+    # The push is the irreversible act: the file is on the public internet
+    # from here on, whether or not the CDN has finished building. Recording
+    # only after a successful liveness check meant a slow Pages build lost
+    # the record for a page that stayed up — which is how eight real shares
+    # went unrecorded while their artifacts sat in the library looking
+    # private. Write first, verify second.
+    shares = list((provenance.get(sha) or {}).get("shares") or [])
+    shares.append({
+        "host": "github_pages",
+        "url": expected_url,
+        "id": short_id,
+        "published_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "verified": False,
+    })
+    provenance.set_(sha, shares=shares)
+
     # Wait for GH Pages to actually build before declaring success.
     print(f"  waiting for GitHub Pages to build (15–60s)…", flush=True)
     def _progress(elapsed):
@@ -254,24 +273,101 @@ def share_via_gh(file: Path, no_clipboard: bool = False) -> str | None:
             print(f"    still building… ({int(elapsed)}s)", flush=True)
     live = _wait_until_live(expected_url, timeout=120.0, on_tick=_progress)
     if not live:
-        print(f"  ⚠  pushed but URL still 404 after 2 min — try again in a bit:")
-        print(f"     {expected_url}")
-        return None
+        # The record is already written, so the URL is not lost — Pages is
+        # just still building. First-ever builds and batches of shares are
+        # the usual cause.
+        print(f"  ⚠  pushed, but Pages hasn't served it yet after 2 min.")
+        print(f"     It should come up shortly: {expected_url}")
+        print(f"     Recorded as unverified; `artifold share --list` has it.")
+        return expected_url
 
-    # Record share into provenance (only after we've confirmed it's actually live)
-    shares = list(entry.get("shares") or [])
-    shares.append({
-        "host": "github_pages",
-        "url": expected_url,
-        "id": short_id,
-        "published_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-    })
-    provenance.set_(sha, shares=shares)
+    # Live — promote the record we wrote before the wait.
+    current = list((provenance.get(sha) or {}).get("shares") or [])
+    for s in current:
+        if s.get("id") == short_id:
+            s["verified"] = True
+    provenance.set_(sha, shares=current)
 
     print(f"  ✓ live: {expected_url}")
     if not no_clipboard and _copy_to_clipboard(expected_url):
         print("  (URL copied to clipboard)")
     return expected_url
+
+
+TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.I | re.S)
+
+
+def _title_of(html: str) -> str:
+    m = TITLE_RE.search(html[:60000])
+    return re.sub(r"\s+", " ", m.group(1)).strip() if m else ""
+
+
+def reconcile(user: str | None = None, apply: bool = False) -> list[dict]:
+    """Rebuild share records from what is actually published.
+
+    The share repo is the ground truth: those files are live on the public
+    internet whatever the local store believes. Records used to be reachable
+    only through a content hash, so an edit plus a GC pass could erase the
+    library's knowledge of a page that stayed up. This walks the published
+    files and re-attaches each one to the artifact it came from.
+
+    Matching is content hash first — exact, because the published filename is
+    the first 8 characters of that hash — then `<title>`, which handles an
+    artifact edited after it was shared. Reports what it cannot place rather
+    than guessing.
+    """
+    repo_dir = SHARE_REPO_DIR
+    if not repo_dir.is_dir():
+        return []
+
+    from .paths import DATA
+    import json as _json
+    projects = []
+    if DATA.exists():
+        try:
+            projects = _json.loads(DATA.read_text()).get("projects") or []
+        except Exception:
+            projects = []
+    by_title: dict[str, dict] = {}
+    for p in projects:
+        t = (p["primary"].get("title") or "").strip()
+        by_title.setdefault(re.sub(r"\s+", " ", t), p)
+
+    known = {s["id"] for s in list_shares()}
+    out: list[dict] = []
+    for f in sorted(repo_dir.glob("*.html")):
+        if f.name == "index.html":
+            continue
+        short_id = f.stem
+        if short_id in known:
+            continue                       # already recorded; nothing to do
+        html = f.read_text(errors="ignore")
+        row = {"id": short_id, "title": _title_of(html), "matched": None,
+               "how": None}
+
+        # 1. the published bytes still exist under their own hash
+        sha = hashlib.sha1(f.read_bytes()).hexdigest()
+        if provenance.get(sha) is not None:
+            row.update(matched=sha, how="content")
+        else:
+            # 2. the artifact was edited after it was shared — find it by title
+            p = by_title.get(row["title"])
+            if p and p["primary"].get("sha1"):
+                row.update(matched=p["primary"]["sha1"], how="title")
+
+        if row["matched"] and apply and user:
+            target = provenance.get(row["matched"]) or {}
+            shares = list(target.get("shares") or [])
+            url = f"https://{user}.github.io/{SHARE_REPO_NAME}/{short_id}.html"
+            if not any(s.get("url") == url for s in shares):
+                shares.append({
+                    "host": "github_pages", "url": url, "id": short_id,
+                    "published_at": None,   # the original timestamp is gone
+                    "recovered": True,
+                })
+                provenance.set_(row["matched"], shares=shares)
+        out.append(row)
+    return out
 
 
 def list_shares() -> list[dict]:
@@ -281,7 +377,9 @@ def list_shares() -> list[dict]:
         for s in entry.get("shares") or []:
             out.append({"sha": sha, **s, "tool": entry.get("tool"),
                         "source": entry.get("source")})
-    out.sort(key=lambda x: x.get("published_at", ""), reverse=True)
+    # Recovered records have no original timestamp — `or ""` rather than a
+    # dict default, because the key is present and holds None.
+    out.sort(key=lambda x: x.get("published_at") or "", reverse=True)
     return out
 
 

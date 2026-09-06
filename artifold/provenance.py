@@ -325,6 +325,15 @@ def gc(active_shas: set[str]) -> int:
         if sha in active_shas or sha in history:
             e.pop("orphaned_at", None)   # re-seen, or part of a live history
             continue
+        # A share is a fact about a URL that is live on the public internet.
+        # It is not a fact about a byte sequence, so it must not die with one.
+        # Losing it silently is the worst outcome here: the artifact stays
+        # published and the library stops being able to say so. (This is how
+        # 11 real shares went missing — the entries that held them were
+        # superseded by an edit, orphaned, and TTL'd out.)
+        if e.get("shares"):
+            e.pop("orphaned_at", None)
+            continue
         # Not in the scan, but its file still exists and no newer content
         # took over the path (variants, depth-excluded or hand-linked
         # files land here). Leave them alone.

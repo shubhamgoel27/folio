@@ -288,9 +288,12 @@ Your first render is almost never perfect. Treat this as a **bug hunt, not a con
 
 ## Step 8: Save to the canonical inbox
 
+**Do Step 8.5 first** if publishing is on — the file you write here should
+already carry its `artifold:published` tag, so it is written once.
+
 If `artifold` is installed: run `artifold inbox <topic>` for the exact path, then Write there. Else default to `~/artifold-inbox/YYYY-MM-DD-<topic-slug>.html`. Slugs: 4–6 words, lowercase, kebab-case. (You may render from a temp path during Step 7 and save once verified, or save first and screenshot in place — either is fine.)
 
-## Step 8.5: Publish it, so it has a link
+## Step 8.5: Publish it, so it has a link — **before** the inbox write
 
 A local file can't be sent to anyone. Publishing gives the page a URL on
 claude.ai that is **private to the user** until they choose to share it from
@@ -300,22 +303,30 @@ the page header — so this costs nothing in privacy terms and saves the whole
 Artifold itself cannot do this: publishing needs a claude.ai session, and a
 standalone CLI has none. You are inside one, so this step belongs here.
 
+**Order matters.** Publish from the temp path you rendered in Step 7, then
+write the inbox copy **once**, with the URL already in its `<head>`. Writing
+to the inbox first and editing the tag in afterwards changes the file's
+content hash, so Artifold records a second revision for an artifact nobody
+edited — which inflates its revision badge and its "Most used" rank.
+
 1. Check the user's preference: `artifold config publish` (prints `on` or
    `off`; treat a missing `artifold` or any error as `on`). If it prints
-   `off`, skip this step entirely.
-2. Publish the saved file with the Artifact tool. Reuse what you already
+   `off`, skip to Step 8 and write the file as normal.
+2. Publish the **temp** file with the Artifact tool. Reuse what you already
    chose: the page's real `<title>`, an emoji favicon that matches the
    conceit, and the intent as the one-line description.
-3. Add the returned URL to the file's `<head>` as an eleventh tag, then
-   leave the file alone:
+3. Add the returned URL to the HTML as an eleventh tag:
    ```html
    <meta name="artifold:published" content="<the returned URL>">
    ```
-   Artifold reads that tag and puts the link on the card, so the user can
-   find it again in a month without searching their history.
+4. Now do Step 8: write that complete file to the inbox path, once.
+
+Artifold reads the tag and puts the link on the card, so the user can find it
+again in a month without searching their history.
 
 If publishing fails or isn't available on this account, say so in one line
-and move on. The local file is the deliverable; the link is a convenience.
+and write the file without the tag. The local file is the deliverable; the
+link is a convenience.
 
 Never republish an artifact the user has already shared publicly without
 asking — a republish changes what their viewers see.
@@ -340,5 +351,5 @@ Don't dump the HTML in chat — the file is the deliverable. Briefly note the on
 8. **Build**: skeleton first, then paint, then the device; add warmth + the weird thing per tier.
 9. **Finish**: copy pass → typeset pass → furniture (captions, sources, folios).
 10. **Verify**: defect hunt at 3 widths → squint test → art-director rubric (per tier); fix, re-render.
-11. **Provenance** (10 tags), save via `artifold inbox`, then publish (8.5) and stamp `artifold:published`.
+11. **Provenance** (10 tags), publish (8.5) and stamp `artifold:published`, then save via `artifold inbox` — one write.
 12. **Hand off in two lines**, name the key decision, stop.

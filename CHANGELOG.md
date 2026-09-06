@@ -1,5 +1,53 @@
 # Changelog
 
+## 0.12.1
+
+**Share records were being lost. Eleven real published pages had no record
+in a live library, and the dashboard reported zero shares.**
+
+I found this while arguing the wrong side of a question — I claimed the
+library showed 0 shares out of 136 and treated that as a fact about how the
+tool gets used. It was a bug. `artifold-share` had 11 pages live on GitHub
+Pages the whole time.
+
+### Root cause: the record was conditional on a race
+
+`share_via_gh` pushed the file, then waited up to two minutes for GitHub
+Pages to build, and **only wrote the provenance record if that check
+passed**. The push is the irreversible act — the file is public from that
+moment — so discarding the record because the CDN was slow is backwards. A
+batch of shares queues Pages builds, which is exactly when the timeout hits.
+
+The record is now written the moment the push lands, carrying
+`verified: false`. The liveness check promotes it to `verified: true`. On
+timeout the record survives, the URL is printed, and `share --list` has it.
+
+### Second, independent hole: the GC could delete a share
+
+An entry holding a share was eligible for orphaning and deletion like any
+other. A share is a fact about a URL on the public internet, not about a
+byte sequence, so `gc` now never expires an entry that holds one.
+
+### Recovering what was lost
+
+New `artifold share --reconcile` walks the share repo — the ground truth —
+and re-attaches each published page to its artifact. It matches by content
+hash first (exact: the filename is the hash prefix), then by `<title>` for
+artifacts edited after they were shared. Dry run by default; `--apply`
+writes. It recovered 10 of 11 on the library that surfaced this; the
+eleventh has no local artifact left to match.
+
+Also fixed: `share --list` crashed sorting recovered records, which carry no
+original timestamp.
+
+### The double-revision from 0.12.0
+
+`/craft` was saving to the inbox and *then* editing the published URL in,
+which is a second content hash — so every new artifact would have shown a
+"2 rev" badge and taken a free +1 in the "Most used" ranking for an edit
+nobody made. It now publishes from the temp render path and writes the inbox
+copy once, with the tag already in it.
+
 ## 0.12.0
 
 Every new `/craft` artifact now gets a link, without you setting up GitHub.

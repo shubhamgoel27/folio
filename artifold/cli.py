@@ -681,6 +681,29 @@ def _cmd_share(args):
             if it.get("source"):
                 print(f"           src: {it['source']}")
         return 0
+    if args.reconcile:
+        user = share._gh_user()
+        rows = share.reconcile(user=user, apply=args.apply)
+        if not rows:
+            print("  every published artifact is already recorded.")
+            return 0
+        placed = [r for r in rows if r["matched"]]
+        lost = [r for r in rows if not r["matched"]]
+        verb = "recorded" if args.apply else "would record"
+        for r in placed:
+            print(f"  {r['id']}  {verb} (by {r['how']})  {r['title'][:56]}")
+        for r in lost:
+            print(f"  {r['id']}  no local artifact matches  {r['title'][:56]}")
+        print()
+        print(f"  {len(placed)} recoverable, {len(lost)} unmatched.")
+        if lost:
+            print("  Unmatched pages are still live — the local artifact was "
+                  "renamed, retitled or deleted.")
+        if not args.apply:
+            print("  Re-run with --apply to write these back.")
+        elif placed:
+            print("  Run `artifold scan` to see them in the dashboard.")
+        return 0
     if args.revoke:
         return 0 if share.revoke(args.revoke) else 1
     if not args.file:
@@ -898,6 +921,11 @@ def main(argv=None) -> int:
     sh.add_argument("file", nargs="?", help="HTML file to share")
     sh.add_argument("--list", action="store_true", help="list previous shares")
     sh.add_argument("--revoke", metavar="ID", help="delete a previously-shared artifact")
+    sh.add_argument("--reconcile", action="store_true",
+                    help="rebuild share records from what is actually published "
+                         "(dry run unless --apply)")
+    sh.add_argument("--apply", action="store_true",
+                    help="with --reconcile: write the recovered records")
     sh.add_argument("--no-clipboard", action="store_true",
                     help="don't copy the URL to clipboard")
     sh.set_defaults(fn=_cmd_share)

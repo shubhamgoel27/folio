@@ -206,6 +206,7 @@ artifold open             # open the existing dashboard
 
 artifold share <file>     # publish to public URL + copy to clipboard
 artifold share --list     # all shares
+artifold share --reconcile   # rebuild records from what is actually published
 artifold share --revoke <id>   # take a public share down
 
 artifold import <url>     # fetch a public Claude/v0/Lovable share URL

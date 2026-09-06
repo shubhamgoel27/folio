@@ -67,9 +67,12 @@ def test_publishing_does_not_mark_an_artifact_as_shared(scanned):
     assert not prov.get("shares")
 
 
-def test_link_backfills_when_the_skill_stamps_it_after_saving(tmp_path):
-    """/craft saves, publishes, then edits the tag in — so the file changes
-    after its first scan. The link must survive that round trip."""
+def test_link_backfills_if_it_is_stamped_after_saving(tmp_path):
+    """Stamping the tag onto an already-saved file still works — but note the
+    cost this documents: the edit is a second content hash, so the artifact
+    gains a revision it did not earn, inflating its badge and its "Most used"
+    rank. That is why the skill publishes from the temp path and writes the
+    inbox copy once, with the tag already in it."""
     f = tmp_path / "a.html"
     cfg, cats = {"allow_repos": [], "max_depth": 3}, {}
     f.write_text(page())
@@ -129,3 +132,68 @@ def test_setting_survives_a_reload(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "CONFIG_FILE", tmp_path / "c.json")
     config.set_("publish", "off")
     assert config.load()["publish"] is False
+
+
+# --- share records must be durable -----------------------------------------
+#
+# Two independent ways 11 real shares went missing from a live library:
+# the record was written only after a liveness check that can time out, and
+# the GC was free to delete an entry that held one.
+
+def _shared_entry(tmp_path, sha="a" * 40):
+    provenance.set_(sha, path=str(tmp_path / "x.html"), shares=[
+        {"host": "github_pages", "url": "https://u.github.io/artifold-share/aaaaaaaa.html",
+         "id": "aaaaaaaa", "published_at": "2026-06-30T07:06:00+00:00"}])
+    return sha
+
+
+def test_gc_never_deletes_an_entry_holding_a_share(tmp_path):
+    """The page stays on the internet whatever the local store forgets."""
+    from datetime import datetime, timedelta, timezone
+    sha = _shared_entry(tmp_path)
+    stale = (datetime.now(timezone.utc)
+             - timedelta(days=provenance.ORPHAN_TTL_DAYS + 1)).isoformat()
+    raw = provenance._load_raw()
+    raw["items"][sha]["orphaned_at"] = stale
+    provenance._save_raw(raw)
+
+    provenance.gc(set())                       # nothing live at all
+    assert provenance.get(sha) is not None
+    assert "orphaned_at" not in provenance.get(sha)
+
+
+def test_gc_still_deletes_an_expired_entry_without_shares(tmp_path):
+    from datetime import datetime, timedelta, timezone
+    stale = (datetime.now(timezone.utc)
+             - timedelta(days=provenance.ORPHAN_TTL_DAYS + 1)).isoformat()
+    raw = provenance._load_raw()
+    raw["items"]["b" * 40] = {"orphaned_at": stale}
+    provenance._save_raw(raw)
+    assert provenance.gc(set()) == 1
+
+
+def test_a_share_survives_editing_the_artifact(tmp_path):
+    """carry_forward must bring the URL to the new hash."""
+    f = tmp_path / "x.html"
+    f.write_text("<html>one</html>")
+    sha = provenance.sha1_of(f)
+    provenance.set_(sha, path=str(f), shares=[
+        {"host": "github_pages", "url": "https://u.github.io/artifold-share/x.html",
+         "id": "x", "published_at": None}])
+    f.write_text("<html>two</html>")
+    provenance.carry_forward(provenance.sha1_of(f), f)
+    assert provenance.get(provenance.sha1_of(f))["shares"][0]["id"] == "x"
+
+
+def test_list_shares_tolerates_a_recovered_record_with_no_timestamp(tmp_path):
+    """Recovered records have published_at=None; sorting must not blow up."""
+    from artifold import share
+    provenance.set_("c" * 40, shares=[
+        {"host": "github_pages", "url": "https://u.github.io/s/c.html",
+         "id": "cccccccc", "published_at": None, "recovered": True}])
+    provenance.set_("d" * 40, shares=[
+        {"host": "github_pages", "url": "https://u.github.io/s/d.html",
+         "id": "dddddddd", "published_at": "2026-06-30T07:06:00+00:00"}])
+    ids = [s["id"] for s in share.list_shares()]
+    assert set(ids) == {"cccccccc", "dddddddd"}
+    assert ids[0] == "dddddddd"          # dated first, undated last
